@@ -14,6 +14,5 @@ path = "src/client/bin/main.rs"
 
 [dependencies]
 clap = "2.32.0"
+daemonize = "0.4.1"
 launchpad = "0.1.1"
-rmp = "0.8.7"
-rmp-serde = "0.13.7"

@@ -1,0 +1,19 @@
+[package]
+name = "lpcontrol"
+version = "0.1.0"
+authors = ["Cassaundra <cass@cassaundra.io>"]
+edition = "2018"
+
+[[bin]]
+name = "lpcd"
+path = "src/daemon/bin/main.rs"
+
+[[bin]]
+name = "lpc-cli"
+path = "src/client/bin/main.rs"
+
+[dependencies]
+clap = "2.32.0"
+launchpad = "0.1.1"
+rmp = "0.8.7"
+rmp-serde = "0.13.7"

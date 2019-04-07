@@ -1,9 +1,6 @@
-use std::time::Duration;
-use std::thread;
 use launchpad::*;
 use clap::{App, crate_authors, crate_description, crate_version};
-use std::fs::File;
-use std::net::{TcpStream, TcpListener};
+use std::net::TcpListener;
 use std::io::Read;
 
 use log::*;
@@ -21,7 +18,6 @@ fn main() {
 	env_logger::init();
 
 	let mut device = LaunchpadMk2::guess();
-	let timeout = Duration::from_millis(1);
 
 	device.light_all(0);
 
@@ -43,14 +39,14 @@ fn start_ipc(device: &mut LaunchpadMk2) {
 				let cmd = num_traits::FromPrimitive::from_u8(buffer[0]);
 
 				match cmd {
-					Some(protocol::Message::Clear) => {
+					Some(Message::Clear) => {
 						device.light_all(0);
 					},
-					Some(protocol::Message::SetColorRaw) => {
+					Some(Message::SetColorRaw) => {
 						// TODO validate input
 						device.light_all(buffer[1]);
 					},
-					Some(protocol::Message::SetColorRGB) => {
+					Some(Message::SetColorRGB) => {
 						// TODO validate input
 						let color = nearest_palette(buffer[1], buffer[2], buffer[3]);
 						device.light_all(color);

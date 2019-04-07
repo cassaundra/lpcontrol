@@ -6,6 +6,5 @@ use num_derive::FromPrimitive;
 #[derive(Debug, FromPrimitive)]
 pub enum Message {
 	Clear = 0x00,
-	SetColorRaw = 0x01,
-	SetColorRGB = 0x02
+	SetColor = 0x01
 }

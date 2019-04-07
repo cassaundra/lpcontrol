@@ -7,6 +7,8 @@ use std::io::Write;
 use log::*;
 
 use lpcontrol::protocol::*;
+use rmp_serde::Serializer;
+use serde::Serialize;
 
 #[macro_use]
 extern crate derive_more;
@@ -15,6 +17,7 @@ extern crate derive_more;
 enum ClientError {
 	NoneError(std::option::NoneError),
 	ParseError(std::num::ParseIntError),
+	IoError(std::io::Error)
 }
 
 fn main() -> Result<(), ClientError> {
@@ -24,13 +27,7 @@ fn main() -> Result<(), ClientError> {
 		.about(crate_description!())
 		.subcommand(SubCommand::with_name("off")
 			.about("Turn off all LEDs"))
-		.subcommand(SubCommand::with_name("raw")
-			.about("Set all LEDs to a color code")
-			.arg(Arg::with_name("value")
-				.help("The color value to send to the device")
-				.index(1)
-				.required(true)))
-		.subcommand(SubCommand::with_name("rgb")
+		.subcommand(SubCommand::with_name("set")
 			.about("Set all LEDs to an RGB color (0-255)")
 			.arg(Arg::with_name("red")
 				.index(1)
@@ -40,6 +37,9 @@ fn main() -> Result<(), ClientError> {
 				.required(true))
 			.arg(Arg::with_name("blue")
 				.index(3)
+				.required(true))
+			.arg(Arg::with_name("duration")
+				.index(4)
 				.required(true)))
 		.get_matches();
 
@@ -47,19 +47,15 @@ fn main() -> Result<(), ClientError> {
 
 	match matches.subcommand() {
 		("off", _) => {
-			send_to_daemon(Message::Clear as u8, vec![]);
-		}
-		("raw", Some(raw_matches)) => {
-			let value: u8 = raw_matches.value_of("value")?.parse()?;
+			send_to_daemon(Message::Clear as u8, vec![])?;
+		},
+		("set", Some(set_matches)) => {
+			let red = set_matches.value_of("red")?.parse()?;
+			let green = set_matches.value_of("green")?.parse()?;
+			let blue = set_matches.value_of("blue")?.parse()?;
+			let duration = set_matches.value_of("duration")?.parse()?;
 
-			send_to_daemon(Message::SetColorRaw as u8, vec![value]);
-		}
-		("rgb", Some(rgb_matches)) => {
-			let red = rgb_matches.value_of("red")?.parse()?;
-			let green = rgb_matches.value_of("green")?.parse()?;
-			let blue = rgb_matches.value_of("blue")?.parse()?;
-
-			send_to_daemon(Message::SetColorRGB as u8, vec![red, green, blue]);
+			send_to_daemon(Message::SetColor as u8, vec![red, green, blue, duration])?;
 		}
 		("", None) => println!("No subcommand specified, try --help."),
 		_ => unreachable!()
@@ -68,15 +64,19 @@ fn main() -> Result<(), ClientError> {
 	Ok(())
 }
 
-fn send_to_daemon(msg_id: u8, payload: Vec<u8>) {
+fn send_to_daemon(msg_id: u8, payload: Vec<u16>) -> Result<(), std::io::Error> {
 	let mut stream = TcpStream::connect(LOCAL_ADDRESS).unwrap();
 
-	let mut payload = payload;
-	let mut buf = vec![msg_id];
-	buf.append(&mut payload);
+	let mut buffer = Vec::new();
 
-	&[msg_id].to_vec().append(&mut payload.to_vec());
-	stream.write(buf.as_ref()).unwrap();
+	rmp::encode::write_u8(&mut buffer, msg_id)?;
+
+	payload.serialize(&mut Serializer::new(&mut buffer)).unwrap();
+
+	stream.write(&buffer[..])?;
+	stream.flush()?;
 
 	info!("Successfully sent command of ID {}", msg_id);
+
+	Ok(())
 } // stream is closed

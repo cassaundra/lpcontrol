@@ -5,14 +5,17 @@ authors = ["Cassaundra <cass@cassaundra.io>"]
 edition = "2018"
 
 [[bin]]
-name = "lpcd"
-path = "src/daemon/bin/main.rs"
+name = "lpcontrold"
+path = "src/bin/lpcontrold.rs"
 
 [[bin]]
-name = "lpc-cli"
-path = "src/client/bin/main.rs"
+name = "lpcontrolc"
+path = "src/bin/lpcontrolc.rs"
 
 [dependencies]
 clap = "2.32.0"
-daemonize = "0.4.1"
 launchpad = "0.1.1"
+log = "0.4.6"
+env_logger = "0.6.1"
+num-traits = "0.2"
+num-derive = "0.2"

@@ -1,3 +1,5 @@
+#![feature(try_trait)]
+
 use clap::{App, crate_authors, crate_description, crate_version, Arg, SubCommand};
 use std::net::TcpStream;
 use std::io::{Write, Error};
@@ -6,19 +8,28 @@ use log::*;
 
 use lpcontrol::protocol::*;
 
-fn main() {
+#[macro_use]
+extern crate derive_more;
+
+#[derive(Debug, From)]
+enum ClientError {
+	NoneError(std::option::NoneError),
+	ParseError(std::num::ParseIntError)
+}
+
+fn main() -> Result<(), ClientError> {
 	let matches = App::new("lpcontrol client")
 		.version(crate_version!())
 		.author(crate_authors!())
 		.about(crate_description!())
 		.subcommand(SubCommand::with_name("off")
 			.about("Turn off all LEDs"))
-		.subcommand(SubCommand::with_name("raw_color")
+		.subcommand(SubCommand::with_name("raw")
 			.arg(Arg::with_name("value")
 				.help("The color value to send to the device")
 				.index(1)
 				.required(true)))
-		.subcommand(SubCommand::with_name("color")
+		.subcommand(SubCommand::with_name("rgb")
 			.arg(Arg::with_name("red")
 				.index(1)
 				.required(true))
@@ -36,20 +47,22 @@ fn main() {
 		Some("off") => {
 			send_to_daemon(Message::Clear as u8, vec![]);
 		},
-		Some("raw_color") => {
-			let matches = matches.subcommand_matches("raw_color").unwrap();
-			let value: u8 = matches.value_of("value").unwrap().parse().unwrap();
+		Some("raw") => {
+			let matches = matches.subcommand_matches("raw")?;
+			let value: u8 = matches.value_of("value")?.parse()?;
 			send_to_daemon(Message::SetColorRaw as u8, vec![value])
 		},
-		Some("color") => {
-			let matches = matches.subcommand_matches("color").unwrap();
-			let red = matches.value_of("red").unwrap().parse().unwrap();
-			let green = matches.value_of("green").unwrap().parse().unwrap();
-			let blue = matches.value_of("blue").unwrap().parse().unwrap();
+		Some("rgb") => {
+			let matches = matches.subcommand_matches("rgb").unwrap();
+			let red = matches.value_of("red")?.parse()?;
+			let green = matches.value_of("green")?.parse()?;
+			let blue = matches.value_of("blue")?.parse()?;
 			send_to_daemon(Message::SetColorRGB as u8, vec![red, green, blue]);
 		},
 		_ => unimplemented!()
 	}
+
+	Ok(())
 }
 
 fn send_to_daemon(msg_id: u8, payload: Vec<u8>) {

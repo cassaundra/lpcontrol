@@ -43,10 +43,18 @@ fn start_ipc(device: &mut LaunchpadMk2) {
 				let cmd = num_traits::FromPrimitive::from_u8(buffer[0]);
 
 				match cmd {
-					Some(protocol::Message::SetColor) => {
-						// TODO validate color
+					Some(protocol::Message::Clear) => {
+						device.light_all(0);
+					},
+					Some(protocol::Message::SetColorRaw) => {
+						// TODO validate input
 						device.light_all(buffer[1]);
 					},
+					Some(protocol::Message::SetColorRGB) => {
+						// TODO validate input
+						let color = nearest_palette(buffer[1], buffer[2], buffer[3]);
+						device.light_all(color);
+					}
 					_ => {}
 				}
 			}

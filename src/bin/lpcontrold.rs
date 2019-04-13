@@ -1,5 +1,5 @@
 use std::io::Read;
-use std::net::{IpAddr, SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener};
 
 use clap::{App, Arg, crate_authors, crate_description, crate_version, value_t};
 use launchpad::*;

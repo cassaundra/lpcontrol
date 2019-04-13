@@ -1,17 +1,18 @@
 #![feature(try_trait)]
 
-use clap::{App, crate_authors, crate_description, crate_version, Arg, SubCommand};
-use std::net::TcpStream;
+#[macro_use]
+extern crate derive_more;
+
 use std::io::Write;
+use std::net::{TcpStream, SocketAddr};
 
+use clap::{App, Arg, crate_authors, crate_description, crate_version, SubCommand, value_t, value_t_or_exit};
 use log::*;
-
-use lpcontrol::protocol::*;
 use rmp_serde::Serializer;
 use serde::Serialize;
 
-#[macro_use]
-extern crate derive_more;
+use lpcontrol::protocol::*;
+
 
 #[derive(Debug, From)]
 enum ClientError {
@@ -25,6 +26,10 @@ fn main() -> Result<(), ClientError> {
 		.version(crate_version!())
 		.author(crate_authors!())
 		.about(crate_description!())
+		.arg(Arg::with_name("address")
+			.short("addr"))
+		.arg(Arg::with_name("port")
+			.short("p"))
 		.subcommand(SubCommand::with_name("off")
 			.about("Turn off all LEDs"))
 		.subcommand(SubCommand::with_name("set")
@@ -43,19 +48,25 @@ fn main() -> Result<(), ClientError> {
 				.required(true)))
 		.get_matches();
 
+	let port = value_t!(matches, "port", u16).unwrap_or(DEFAULT_PORT);
+
 	env_logger::init();
+
+	let address = SocketAddr::from((LOCAL_ADDRESS, port));
 
 	match matches.subcommand() {
 		("off", _) => {
-			send_to_daemon(Message::Clear as u8, vec![])?;
+			send_to_daemon(address, Command::Clear as u8, vec![])?;
 		},
 		("set", Some(set_matches)) => {
-			let red = set_matches.value_of("red")?.parse()?;
-			let green = set_matches.value_of("green")?.parse()?;
-			let blue = set_matches.value_of("blue")?.parse()?;
-			let duration = set_matches.value_of("duration")?.parse()?;
+			// TODO clean
+			// should panic
+			let red = value_t_or_exit!(set_matches, "red", u16);
+			let green = value_t_or_exit!(set_matches, "green", u16);
+			let blue = value_t_or_exit!(set_matches, "blue", u16);
+			let duration = value_t_or_exit!(set_matches, "duration", u16);
 
-			send_to_daemon(Message::SetColor as u8, vec![red, green, blue, duration])?;
+			send_to_daemon(address, Command::SetColor as u8, vec![red, green, blue, duration])?;
 		}
 		("", None) => println!("No subcommand specified, try --help."),
 		_ => unreachable!()
@@ -64,8 +75,9 @@ fn main() -> Result<(), ClientError> {
 	Ok(())
 }
 
-fn send_to_daemon(msg_id: u8, payload: Vec<u16>) -> Result<(), std::io::Error> {
-	let mut stream = TcpStream::connect(LOCAL_ADDRESS).unwrap();
+fn send_to_daemon(address: SocketAddr, msg_id: u8, payload: Vec<u16>) -> Result<(), std::io::Error> {
+	// quick one-shot connection
+	let mut stream = TcpStream::connect(address).unwrap();
 
 	let mut buffer = Vec::new();
 

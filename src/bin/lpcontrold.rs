@@ -1,28 +1,14 @@
+use std::io::Read;
+use std::net::{IpAddr, SocketAddr, TcpListener};
+
+use clap::{App, Arg, crate_authors, crate_description, crate_version, value_t};
 use launchpad::*;
-use clap::{App, crate_authors, crate_description, crate_version};
-use std::net::TcpListener;
-use std::io::{Read, stdout, Write};
-
 use log::*;
-
-use lpcontrol::protocol;
-use lpcontrol::protocol::{LOCAL_ADDRESS, Message};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
-#[derive(Debug)]
-struct Color(u8, u8, u8);
-
-impl Color {
-	fn lerp(a: Self, b: Self, t: f32) -> Color {
-		let lerp_1d = |a: u8, b: u8, t: f32| -> u8 {
-			let diff = (b - a) as f32;
-			a + (diff * t) as u8
-		};
-
-		Color(lerp_1d(a.0, b.0, t), lerp_1d(a.1, b.1, t), lerp_1d(a.2, b.2, t))
-	}
-}
+use lpcontrol::protocol;
+use lpcontrol::protocol::{Command, DEFAULT_PORT, LOCAL_ADDRESS};
 
 fn main() {
 	// TODO custom port
@@ -30,7 +16,10 @@ fn main() {
 		.version(crate_version!())
 		.author(crate_authors!())
 		.about(crate_description!())
+		.arg(Arg::with_name("port"))
 		.get_matches();
+
+	let port = value_t!(matches, "port", u16).unwrap_or(DEFAULT_PORT);
 
 	env_logger::init();
 
@@ -38,19 +27,14 @@ fn main() {
 
 	device.light_all(0);
 
-	start_ipc(&mut device);
+	start_ipc(&mut device, port);
 }
 
-fn start_ipc(device: &mut LaunchpadMk2) {
+fn start_ipc(device: &mut LaunchpadMk2, port: u16) {
 	// open TCP socket for interprocess communication
-	let listener = TcpListener::bind(LOCAL_ADDRESS).unwrap();
+	let listener = TcpListener::bind(SocketAddr::from((LOCAL_ADDRESS, port))).unwrap();
 
-	info!("Listening on TCP port {}", protocol::PORT);
-
-	let mut color = Color(0, 0, 0);
-	let mut current_color = color;
-	let duration: u32 = 0;
-
+	info!("Listening on TCP port {}", protocol::DEFAULT_PORT);
 	for stream in listener.incoming() {
 		match stream {
 			Ok(mut stream) => {
@@ -60,27 +44,30 @@ fn start_ipc(device: &mut LaunchpadMk2) {
 				let cmd = rmp::decode::read_u8(&mut &buffer[..]).unwrap();
 				let cmd = num_traits::FromPrimitive::from_u8(cmd);
 
-				match cmd {
-					Some(Message::Clear) => {
-						device.light_all(0);
-					},
-					Some(Message::SetColor) => {
-						// TODO validate input
-
-						let mut de = Deserializer::new(&buffer[2..]);
-						let packet: (u8, u8, u8, u32) = Deserialize::deserialize(&mut de).unwrap();
-
-						color = Color(packet.0, packet.1, packet.2);
-
-						let midi_color = nearest_palette(packet.0, packet.1, packet.2);
-						device.light_all(midi_color);
-					}
-					_ => {}
-				}
+				// omit first two bytes indicating type
+				execute_command(device, cmd, &buffer[2..]);
 			}
 			Err(e) => {
 				eprintln!("Unable to connect: {}", e);
 			}
 		}
+	}
+}
+
+fn execute_command(device: &mut LaunchpadMk2, command: Option<Command>, buffer: &[u8]) {
+	match command {
+		Some(Command::Clear) => {
+			device.light_all(0);
+		},
+		Some(Command::SetColor) => {
+			// TODO validate input
+
+			let mut de = Deserializer::new(&buffer[..]);
+			let packet: (u8, u8, u8, u32) = Deserialize::deserialize(&mut de).unwrap();
+
+			let midi_color = nearest_palette(packet.0, packet.1, packet.2);
+			device.light_all(midi_color);
+		}
+		_ => {}
 	}
 }

@@ -42,9 +42,16 @@ fn main() -> Result<(), ClientError> {
 				.required(true))
 			.arg(Arg::with_name("blue")
 				.index(3)
+				.required(true)))
+		.subcommand(SubCommand::with_name("flash")
+			.arg(Arg::with_name("red")
+				.index(1)
 				.required(true))
-			.arg(Arg::with_name("duration")
-				.index(4)
+			.arg(Arg::with_name("green")
+				.index(2)
+				.required(true))
+			.arg(Arg::with_name("blue")
+				.index(3)
 				.required(true)))
 		.get_matches();
 
@@ -64,9 +71,15 @@ fn main() -> Result<(), ClientError> {
 			let red = value_t_or_exit!(set_matches, "red", u16);
 			let green = value_t_or_exit!(set_matches, "green", u16);
 			let blue = value_t_or_exit!(set_matches, "blue", u16);
-			let duration = value_t_or_exit!(set_matches, "duration", u16);
 
-			send_to_daemon(address, Command::SetColor as u8, vec![red, green, blue, duration])?;
+			send_to_daemon(address, Command::SetColor as u8, vec![red, green, blue])?;
+		},
+		("flash", Some(set_matches)) => {
+			let red = value_t_or_exit!(set_matches, "red", u16);
+			let green = value_t_or_exit!(set_matches, "green", u16);
+			let blue = value_t_or_exit!(set_matches, "blue", u16);
+
+			send_to_daemon(address, Command::FlashColor as u8, vec![red, green, blue])?;
 		}
 		("", None) => println!("No subcommand specified, try --help."),
 		_ => unreachable!()

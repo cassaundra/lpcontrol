@@ -35,6 +35,7 @@ fn start_ipc(device: &mut LaunchpadMk2, port: u16) {
 	let listener = TcpListener::bind(SocketAddr::from((LOCAL_ADDRESS, port))).unwrap();
 
 	info!("Listening on TCP port {}", protocol::DEFAULT_PORT);
+
 	for stream in listener.incoming() {
 		match stream {
 			Ok(mut stream) => {
@@ -63,11 +64,24 @@ fn execute_command(device: &mut LaunchpadMk2, command: Option<Command>, buffer: 
 			// TODO validate input
 
 			let mut de = Deserializer::new(&buffer[..]);
-			let packet: (u8, u8, u8, u32) = Deserialize::deserialize(&mut de).unwrap();
+			let packet: (u8, u8, u8) = Deserialize::deserialize(&mut de).unwrap();
+
+			let smart = lpcontrol::color::rgb_to_lab(packet.0, packet.1, packet.2);
 
 			let midi_color = nearest_palette(packet.0, packet.1, packet.2);
 			device.light_all(midi_color);
-		}
+		},
+		Some(Command::FlashColor) => {
+
+		},
+		Some(Command::PulseColor) => {
+
+		},
 		_ => {}
 	}
+}
+
+/// Parses an RGB color in a msgpack packet into a MIDI byte
+fn parse_color() -> u8 {
+	unimplemented!()
 }
